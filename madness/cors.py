@@ -2,6 +2,8 @@
 from functools import wraps
 from typing import Callable, Tuple, List, Any
 
+from werkzeug.wrappers import Response
+
 from .decorators import decoratormethod
 
 class CORSMixIn():
@@ -27,12 +29,8 @@ class CORSMixIn():
                     if request_origin in origin:
                         options_headers['Access-Control-Allow-Origin'] = request_origin
                         options_headers['Access-Control-Allow-Methods'] = ', '.join(methods)
-                        if 'Access-Control-Request-Headers' in request.headers:
-                            if headers == None:
-                                allow_headers = request.headers['Access-Control-Request-Headers']
-                            else:
-                                allow_headers = ', '.join(headers)
-                            options_headers['Access-Control-Allow-Headers'] = allow_headers
+                        if headers != None:
+                            options_headers['Access-Control-Allow-Headers'] = ', '.join(headers)
 
                     if vary:
                         options_headers['Vary'] = vary
