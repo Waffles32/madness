@@ -45,14 +45,18 @@ def bind_endpoint(endpoint, context_decorators):
                 gen = context.run(func)
                 if isgenerator(gen):
                     try:
-                        gen.send(None)
+                        # context yielded during except handler
+                        response = gen.send(None)
+                        if response != None:
+                            #print(gen, 'except handler returned', response)
+                            break
                     except StopIteration:
                         pass
                     else:
                         exitstack.append(gen)
-
-            # if endpoint aborts, allow context to catch it!
-            response = context.run(endpoint)
+            else:
+                # context did not abort the request
+                response = context.run(endpoint)
 
         except Exception as exception:
             # allow context to recover from an error
