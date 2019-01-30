@@ -1,7 +1,5 @@
 
-from json import dumps
-
-from madness import Madness, Response, request, context
+from madness import Madness, request, context, json, response
 
 from exceptions import APIException
 
@@ -19,12 +17,7 @@ def catch():
     try:
         response = yield
     except APIException as exception:
-        text = dumps({'message': exception.message}, indent=True)
-        yield Response(
-            [text],
-            status = exception.status,
-            mimetype='application/json; charset=utf-8'
-        )
+        yield json.response({'message': exception.message}, status=exception.status)
 
 @app.index
 def home(x):
@@ -48,7 +41,7 @@ def home(x):
         </body>
     </html
     '''
-    return Response([text], mimetype='text/html')
+    return response([text], mimetype='text/html')
 
 
 @app.route
@@ -57,24 +50,20 @@ def throw():
 
 @app.error(404)
 def my404():
-    return Response(['not found!!'])
+    return response(['not found!!'])
 
 @app.route('relative/path')
 def mypath():
-    return Response(['wow!!'])
+    return response(['wow!!'])
 
 @app.route(origin='*', methods=['GET', 'OPTIONS'])
 def crossdomain():
-    return Response(['from anywhere!'])
+    return response(['from anywhere!'])
 
 import module
 app.extend(module.app, 'module')
 
 
-
 if __name__ == '__main__':
     print(app.routes)
     app.run()
-else:
-    # WSGI application for production
-    application = app.callable()

@@ -1,5 +1,5 @@
 
-from madness import Madness, Response, request
+from madness import Madness, response, request, json
 
 from exceptions import Forbidden
 
@@ -31,13 +31,13 @@ def home(x):
         </body>
     </html
     '''
-    return Response([text], mimetype='text/html')
+    return response([text], mimetype='text/html')
 
 
 @app.route('/protected', context=[user])
 def greet(username):
-    return Response([f'welcome back, {username}'])
+    return response([f'welcome back, {username}'])
 
 @app.route('.json')
 def describe():
-    return Response(['{"version": "0.0.1"}'], mimetype='application/json; charset=utf-8')
+    return json.response({"version": "0.0.1"})
