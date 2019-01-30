@@ -4,7 +4,7 @@ from pathlib import Path
 
 setup(
     name = "madness",
-    version = "0.1.0",
+    version = "0.2.0",
     author = "Forrest Button",
     author_email = "forrest.button@gmail.com",
     description = "",
