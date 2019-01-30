@@ -6,6 +6,7 @@ from pprint import pprint
 from inspect import isgenerator, getfullargspec
 from functools import partial, wraps
 from itertools import chain
+from contextlib import redirect_stdout
 
 from more_itertools import collapse
 from werkzeug.wrappers import Request, Response
@@ -305,9 +306,15 @@ class RoutingMixIn():
     analogous to flask.Flask and flask.Blueprint combined
     """
 
+    _application_changed: bool = True
+
     context: List[Callable] = field(default_factory=decoratorlist)
 
     routes: List[Route] = field(default_factory=list)
+
+    def _add_route(self, route):
+        self._application_changed = True
+        self.routes.append(route)
 
     def __iter__(self):
         yield from self.routes
@@ -322,7 +329,7 @@ class RoutingMixIn():
                 methods = methods,
                 context = [self.context, context],
             )
-            self.routes.append(route)
+            self._add_route(route)
         return endpoint
 
     def extend(self, routes: Iterable[Route], path='', context=True):
@@ -343,7 +350,7 @@ class RoutingMixIn():
             route = replace(route, path = path + route.path)
             if context:
                 route = replace(route, context = [self.context, route.context])
-            self.routes.append(route)
+            self._add_route(route)
 
 
 
@@ -352,6 +359,8 @@ class RoutingMixIn():
 class Madness(CORSMixIn, RoutingMixIn, RESTFulRoutesMixIn):
     """the entrypoint
     """
+
+    _application = None
 
     errors: Dict[int, Callable] = field(default_factory=dict)
 
@@ -363,13 +372,9 @@ class Madness(CORSMixIn, RoutingMixIn, RESTFulRoutesMixIn):
         self.errors[status_code] = endpoint
         return endpoint
 
-    def callable(self, debug=False) -> Callable:
-        """create a WSGI application
-        see `uwsgi --callable`
-        """
+    def get_application(self, debug:bool=False) -> Callable:
 
-        routes = tuple(self)
-        mapper = Map([route.rule for route in routes])
+        mapper = Map([route.rule for route in self])
 
         errors = {
             code: bind_endpoint(endpoint, self.context)
@@ -378,7 +383,7 @@ class Madness(CORSMixIn, RoutingMixIn, RESTFulRoutesMixIn):
 
         if debug:
             print('-'*10, 'routes', '-'*10)
-            for route in routes:
+            for route in self:
                 print(route)
             print('-'*28)
             pprint(errors)
@@ -389,7 +394,7 @@ class Madness(CORSMixIn, RoutingMixIn, RESTFulRoutesMixIn):
             global local, Request, response, Response
             nonlocal mapper, errors
             local.request = Request(environ)
-            local.context = Context()
+            local.context = Context(debug=debug)
             adapter = mapper.bind_to_environ(environ)
             try:
                 endpoint, kwargs = adapter.match()
@@ -414,12 +419,20 @@ class Madness(CORSMixIn, RoutingMixIn, RESTFulRoutesMixIn):
 
         return wsgi_application
 
+    def __call__(self, environ, start_response):
+        """the WSGI application"""
+        if self._application_changed:
+            self._application = self.get_application()
+            self._application_changed = False
+        return self._application(environ, start_response)
+
+
     def run(self, *, port=9090, host='127.0.0.1', debug=True):
         """run development server"""
         run_simple(
             host,
             port,
-            self.callable(debug=debug),
+            self.get_application(debug=debug),
             use_debugger = debug,
             use_reloader = debug
         )
