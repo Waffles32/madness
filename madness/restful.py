@@ -41,9 +41,7 @@ class RESTFulRoutesMixIn(HTTPMethodsMixIn):
     @decoratormethod
     def index(self, endpoint, *paths, **kwargs):
         "display a list of this resource"
-        for path in paths or ['']:
-            self.get(endpoint, f'{path}', **kwargs)
-        return endpoint
+        return self.get(endpoint, *paths or [''], **kwargs)
 
     @decoratormethod
     def new(self, endpoint, *paths, **kwargs):
@@ -55,34 +53,32 @@ class RESTFulRoutesMixIn(HTTPMethodsMixIn):
     @decoratormethod
     def create(self, endpoint, *paths, **kwargs):
         "add a new resource to database, then redirect"
-        for path in paths or ['']:
-            self.post(endpoint, path, **kwargs)
-        return endpoint
+        return self.post(endpoint, *paths or [''], **kwargs)
 
     @decoratormethod
     def show(self, endpoint, *paths, **kwargs):
         "show info about one resource"
         for path in paths or ['']:
-            self.get(endpoint, f'/<int:id>{path}', **kwargs)
+            self.get(endpoint, f'/{self.resource_id}{path}', **kwargs)
         return endpoint
 
     @decoratormethod
     def edit(self, endpoint, *paths, **kwargs):
         "show a form to edit one resource"
         for path in paths or ['']:
-            self.get(endpoint, f'/<int:id>/edit{path}', **kwargs)
+            self.get(endpoint, f'/{self.resource_id}/edit{path}', **kwargs)
         return endpoint
 
     @decoratormethod
     def update(self, endpoint, *paths, **kwargs):
         "update a particular resource, then redirect"
         for path in paths or ['']:
-             self.put(endpoint, f'/<int:id>{path}', **kwargs)
+             self.put(endpoint, f'/{self.resource_id}{path}', **kwargs)
         return endpoint
 
     @decoratormethod
     def destroy(self, endpoint, *paths, **kwargs):
         "delete a particular resource, then redirect"
         for path in paths or ['']:
-             self.delete(endpoint, f'/<int:id>{path}', **kwargs)
+             self.delete(endpoint, f'/{self.resource_id}{path}', **kwargs)
         return endpoint
