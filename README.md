@@ -1,6 +1,28 @@
 # madness
 
-use methods for your madness
+Madness orchestrates the HTTP request-response cycle using context functions to build abstractions and route functions to transform abstractions into a HTTP responses.
+
+
+## Principles
+
+[DRY](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
+
+[Dependency_inversion_principle](https://en.wikipedia.org/wiki/Dependency_inversion_principle)
+
+  use `@context` to build abstractions for your low-level modules `@context and @route`
+
+  e.g.
+
+    @context authenticate the HTTP request `context.username = 'xyz'`
+
+    @context get database connection `context.database = Database()`
+
+    @context(database) select data using the database connection `context.data = database.myobjects.find(context.id)`
+
+    @show(data) convert data to HTTP response `return json.response(data)`
+
+[Do One Thing and Do It Well.](https://en.wikipedia.org/wiki/Unix_philosophy#Do_One_Thing_and_Do_It_Well)
+
 
 ## Installing
 
