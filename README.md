@@ -59,7 +59,9 @@ decorator | path | method
 `@app.destroy` | /:id{path} | DELETE
 
 
-#### AWS
+#### AWS Lambda
+
+see also: [RequestResponse](https://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html)
 
 ```python
 from madness import json
@@ -73,8 +75,15 @@ def process(event: EventSchema):
     return {'y': event['x'] + 2}
 ```
 
-if you [annotate the event with a marshmallow schema](https://github.com/Waffles32/madness/blob/master/examples/lambda_handler.py) it is automatically validated :)
+if you annotate the event with a marshmallow schema, it is automatically validated :)
 
+### handling routing errors
+
+```python
+@app.error(404)
+def my404handler():
+    return response(['not found'], status = 404)
+```
 
 ***
 
@@ -112,6 +121,7 @@ contexts run in the order they are added
 [rule args](http://werkzeug.pocoo.org/docs/0.14/routing/) are added to context
 
 e.g. `@app.route('path/<myvar>')` creates `context.myvar`
+
 
 ### Basic Context Functions
 
