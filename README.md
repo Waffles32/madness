@@ -26,13 +26,13 @@ if __name__ == '__main__':
 
 ## Routing
 
-`@app.route(*paths, methods=[], context=[])`          
+`@app.route(*paths, methods=[], context=[], origin=None, headers=[])`          
 
 option | description
 ------------ | -------------
 `*paths` | relative paths, defaults to the decorated function name
 `methods` | list of allowed http methods
-`context` | list of extra context functions see [contexts](https://github.com/Waffles32/madness/blob/master/context.md)
+`context` | list of extra context functions see #Context
 `origin` | allowed origin: \* or list of urls
 `headers` | allowed request headers: list of header names
 
@@ -61,9 +61,20 @@ decorator | path | method
 
 #### AWS
 
-`@app.lambda_handler`
+```python
+from madness import json
 
-[usage](https://github.com/Waffles32/madness/blob/development/examples/lambda_handler.py)
+@json.schema
+class EventSchema():
+  x: int = 1
+
+@app.lambda_handler
+def process(event: EventSchema):
+    return {'y': event['x'] + 2}
+```
+
+if you [annotate the event with a marshmallow schema](https://github.com/Waffles32/madness/blob/master/examples/lambda_handler.py) it is automatically validated :)
+
 
 ***
 
