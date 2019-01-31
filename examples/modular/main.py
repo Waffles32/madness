@@ -65,5 +65,4 @@ app.extend(module.app, 'module')
 
 
 if __name__ == '__main__':
-    print(app.routes)
     app.run()
