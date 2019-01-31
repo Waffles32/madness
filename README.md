@@ -130,8 +130,8 @@ def continue_processing(x):
 
 @app.route
 def double(y):
-  "doubles context.y and sends it as a JSON response"
-  return json.response(y * 2) # 12
+    "doubles context.y and sends it as a JSON response"
+    return json.response(y * 2) # 12
 
 ```
 
@@ -146,23 +146,27 @@ the response/exception is bubbled through the context handlers
 ```python
 @app.context
 def advanced_context():
-  # before_request
-  if request.headers.get('x-api-key') != 'valid-api-key':
-    # abort
-    yield json.response({'message': 'invalid api key'}, status = 403)
-  else:
-    # run remaining context functions and the route endpoint (if not aborted)
-    try:
-      response = yield
-    except MyException as exception:
-      yield json.response({'message': exception.message}, status = 500)
+    # before_request
+    if request.headers.get('x-api-key') != 'valid-api-key':
+        # abort
+        yield json.response({'message': 'invalid api key'}, status = 403)
     else:
-      # modify the response headers
-      response.headers['x-added-by-context'] = 'value'
+        # run remaining context functions and the route endpoint (if not aborted)
+        try:
+            response = yield
 
-      # abort
-      yield json.response('we decided to not send the original response, isn\'t that weird?')
-    finally:
-      # after_request
-      pass
+        except MyException as exception:
+            yield json.response({'message': exception.message}, status = 500)
+
+        else:
+            # modify the response headers
+            response.headers['x-added-by-context'] = 'value'
+
+            # abort
+            yield json.response('we decided to not send the original response, isn\'t that weird?')
+
+        finally:
+            # after_request
+            pass
+
 ```
