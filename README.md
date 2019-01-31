@@ -46,7 +46,11 @@ you can still use options with these!
 
 #### RESTful routes
 
-these routes bind to specific HTTP method(s) and rewrite the path
+inspired by Ruby on Rails' `resources`
+
+https://gist.github.com/alexpchin/09939db6f81d654af06b
+
+https://medium.com/@shubhangirajagrawal/the-7-restful-routes-a8e84201f206
 
 decorator | path | method
 ------------ | ------------- | -------------
