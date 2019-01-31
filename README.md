@@ -17,10 +17,10 @@ app = Madness()
 
 @app.index
 def hello():
-  return response(['Hello, world!'])
+    return response(['Hello, world!'])
 
 if __name__ == '__main__':
-  app.run()
+    app.run()
 ```
 
 
@@ -66,7 +66,7 @@ from madness import json
 
 @json.schema
 class EventSchema():
-  x: int = 1
+    x: int = 1
 
 @app.lambda_handler
 def process(event: EventSchema):
@@ -89,7 +89,7 @@ module = Madness()
 
 @module.route
 def thing():
-  return response(['hello!'])
+    return response(['hello!'])
 
 app.extend(module) # now app has /thing
 
