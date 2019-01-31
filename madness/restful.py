@@ -73,7 +73,7 @@ class RESTFulRoutesMixIn(HTTPMethodsMixIn):
     def update(self, endpoint, *paths, **kwargs):
         "update a particular resource, then redirect"
         for path in paths or ['']:
-             self.put(endpoint, f'/{self.resource_id}{path}', **kwargs)
+             self.route(endpoint, f'/{self.resource_id}{path}', methods=['PATCH', 'PUT'], **kwargs)
         return endpoint
 
     @decoratormethod
