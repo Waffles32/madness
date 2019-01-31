@@ -4,10 +4,10 @@ from pathlib import Path
 
 setup(
     name = "madness",
-    version = "0.2.0",
+    version = "0.3.0",
     author = "Forrest Button",
     author_email = "forrest.button@gmail.com",
-    description = "",
+    description = "wsgi microframework suitable for building modular DRY RESTful APIs",
     long_description = Path("README.md").read_text(),
     long_description_content_type = "text/markdown",
     url = "https://github.com/Waffles32/madness",
@@ -24,8 +24,8 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-	include_package_data = True,
+	include_package_data = False,
 	install_requires = Path('requirements.txt').read_text().splitlines(),
 	python_requires='>3.6',
-	zip_safe = False,
+	zip_safe = True,
 )
