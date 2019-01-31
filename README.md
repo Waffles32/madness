@@ -23,10 +23,6 @@ if __name__ == '__main__':
   app.run()
 ```
 
-```console
-$ uwsgi --http :9090 --wsgi-file myapp.py --callable=app --master --processes 4 --threads 1
-```
-
 
 ## Routing
 
@@ -48,7 +44,7 @@ you can still use options with these!
 
 `@app.get, @app.post, @app.put, @app.delete, @app.patch, @app.options`
 
-#### RESTful
+#### RESTful routes
 
 these routes bind to specific HTTP method(s) and rewrite the path
 
@@ -69,6 +65,7 @@ decorator | path | method
 
 [usage](https://github.com/Waffles32/madness/blob/development/examples/lambda_handler.py)
 
+***
 
 ## Modules
 
@@ -93,7 +90,7 @@ if __name__ == '__main__':
   app.run()
 ```
 
-
+***
 
 ## Context
 
@@ -105,7 +102,7 @@ contexts run in the order they are added
 
 e.g. `@app.route('path/<myvar>')` creates `context.myvar`
 
-### A Simple Example
+### Basic Context Functions
 
 ```python
 from madness import context, json
