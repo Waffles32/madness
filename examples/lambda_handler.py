@@ -9,7 +9,6 @@ class MyEvent():
 
 @app.lambda_handler
 def process(event: MyEvent):
-    print('RUN HANDLER')
     # curl -v --data '{"x": []}' 127.0.0.1:9090/process
     # curl --data '{"x": 1}' 127.0.0.1:9090/process
     print('event is', event)
