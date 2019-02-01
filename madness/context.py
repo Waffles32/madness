@@ -1,5 +1,6 @@
 from inspect import isgenerator, getfullargspec
 
+from werkzeug.exceptions import HTTPException
 from werkzeug.local import Local, LocalManager, LocalProxy, LocalStack
 
 from .exceptions import MissingContextVariable
