@@ -2,24 +2,14 @@
 
 Madness orchestrates the HTTP request-response cycle using context functions to build abstractions and route functions to transform abstractions into a HTTP responses.
 
+It is built upon the fabulous [werkzeug](https://github.com/pallets/werkzeug) routing system.
+
 
 ## Principles
 
-[DRY](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
+[Don't repeat yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
 
-[Dependency_inversion_principle](https://en.wikipedia.org/wiki/Dependency_inversion_principle)
-
-  use `@context` to build abstractions for your low-level modules `@context and @route`
-
-  e.g.
-
-    @context authenticate the HTTP request `context.username = 'xyz'`
-
-    @context get database connection `context.database = Database()`
-
-    @context(database) select data using the database connection `context.data = database.myobjects.find(context.id)`
-
-    @show(data) convert data to HTTP response `return json.response(data)`
+[Dependency inversion principle](https://en.wikipedia.org/wiki/Dependency_inversion_principle)
 
 [Do One Thing and Do It Well.](https://en.wikipedia.org/wiki/Unix_philosophy#Do_One_Thing_and_Do_It_Well)
 
@@ -57,6 +47,7 @@ option | description
 `context` | list of extra context functions see #Context
 `origin` | allowed origin: \* or list of urls
 `headers` | allowed request headers: list of header names
+`wsgi` | set to True if the route implements a [WSGI interface](https://www.python.org/dev/peps/pep-0333/)
 
 ***
 
@@ -140,9 +131,21 @@ if __name__ == '__main__':
 
 ## Context
 
-madness.context contains the current context
+madness.context contains the *abstractions* created by the previous contexts
 
-contexts run in the order they are added
+use `@context` to build abstractions for your low-level modules `@context and @route`
+
+```
+e.g.
+
+  @context authenticate the HTTP request `context.username = 'xyz'`
+
+  @context get database connection `context.database = Database()`
+
+  @context(database) use database connection `context.data = database.myobjects.find(context.id)`
+
+  @show(data) convert data to HTTP response `return json.response(data)`
+```
 
 [rule args](http://werkzeug.pocoo.org/docs/0.14/routing/) are added to context
 
