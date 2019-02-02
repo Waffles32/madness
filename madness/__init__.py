@@ -10,10 +10,11 @@ from .cors import CORSMixIn
 from .restful import RESTFulRoutesMixIn
 from .application import ApplicationMixIn
 from .context import request, context
+from .leverage import ApplicationAsRouteMixIn
 
 __all__ = ()
 
 @dataclass
-class Madness(CORSMixIn, LambdaMixIn, RESTFulRoutesMixIn, ApplicationMixIn):
+class Madness(CORSMixIn, LambdaMixIn, RESTFulRoutesMixIn, ApplicationAsRouteMixIn, ApplicationMixIn):
     """
     """
