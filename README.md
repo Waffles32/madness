@@ -48,6 +48,8 @@ option | description
 `context` | list of extra context functions see #Context
 `origin` | allowed origin: \* or list of urls
 `headers` | allowed request headers: list of header names
+`vary` | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Vary
+`max_age` | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Max-Age
 `wsgi` | set to True if the route implements a [WSGI interface](https://www.python.org/dev/peps/pep-0333/)
 
 ***
