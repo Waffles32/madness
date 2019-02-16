@@ -5,7 +5,7 @@ Madness orchestrates the HTTP request-response cycle using context functions to 
 It is built upon the fabulous [werkzeug](https://github.com/pallets/werkzeug) routing system.
 
 
-## Principles
+## Guiding Principles
 
 [Don't repeat yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
 
@@ -13,6 +13,7 @@ It is built upon the fabulous [werkzeug](https://github.com/pallets/werkzeug) ro
 
 [Do One Thing and Do It Well.](https://en.wikipedia.org/wiki/Unix_philosophy#Do_One_Thing_and_Do_It_Well)
 
+[The Zen of Python](https://www.python.org/dev/peps/pep-0020/)
 
 ## Installing
 
