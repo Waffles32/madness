@@ -27,10 +27,10 @@ def flask404(e):
     return jsonify(flask404=True)
 
 # use flask routes as fallback
-app.error(404, wsgi=True)(flask)
+app.error(flask, 404, wsgi=True)
 
 # route /flaskapp to flask's /
-app.route('flaskapp', wsgi=True)(flask)
+app.route(flask, 'flaskapp', wsgi=True)
 
 
 if __name__ == '__main__':
