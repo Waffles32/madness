@@ -1,6 +1,6 @@
 # madness
 
-Madness orchestrates the HTTP request-response cycle using context functions to build abstractions and route functions to transform abstractions into a HTTP responses.
+Madness orchestrates the HTTP request-response cycle using context functions to build abstractions and route functions to transform abstractions into a HTTP response.
 
 It is built upon the fabulous [werkzeug](https://github.com/pallets/werkzeug) routing system.
 
