@@ -1,59 +1,101 @@
 
-from dataclasses import dataclass, replace, field
-from typing import Any, Callable, Iterable, List, Dict, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Callable
+from functools import partial, wraps
 
-from .decorators import decoratormethod, decoratorlist
-from .route import Route
+from more_itertools import collapse
+from werkzeug.routing import Rule
+
+from .routines import run_in_middleware, run_in_kwargs
+from .context import context
+
+__all__ = (
+	'routes',
+	'route',
+	'get', 'post', 'put', 'delete', 'patch', 'options',
+	'index', 'new', 'create', 'show', 'edit', 'update', 'destroy'
+)
 
 
 @dataclass
-class RoutingMixIn():
-    """
-    analogous to flask.Flask and flask.Blueprint combined
-    """
+class Route():
+	path: str
+	view_func: Callable
+	methods: list = field(default_factory=list)
+	defaults: dict = field(default_factory=dict)
+	middleware: list = field(default_factory=list)
 
-    _application_changed: bool = True
+	def as_rule(self):
+		return Rule(
+			self.path,
+			endpoint = self.as_view(),
+			methods = self.methods or None,
+			defaults = self.defaults
+		)
 
-    context: List[Callable] = field(default_factory=decoratorlist)
+	def as_view(self):
+		return lambda: run_in_middleware(self.view_func, self.middleware)
 
-    routes: List[Route] = field(default_factory=list)
+	def mount(self, path=None):
+		return replace(self, path = f'{path}{self.path}' if path else self.path)
 
-    def _add_route(self, route):
-        self._application_changed = True
-        self.routes.append(route)
+	def insert_middleware(self, middleware):
+		return replace(self, middleware = [*middleware, *self.middleware])
 
-    def __iter__(self):
-        yield from self.routes
+	def add_methods(self, methods):
+		return replace(self, methods = list(set([*methods, *self.methods])))
 
-    @decoratormethod
-    def route(self, endpoint, *paths, methods=[], context=[]):
+	def add_defaults(self, defaults):
+		return replace(self, defaults = {**defaults, **self.defaults})
 
-        for path in paths or [endpoint.__name__]:
-            route = Route(
-                path = path,
-                endpoint = endpoint,
-                methods = methods,
-                context = [self.context, context],
-            )
-            self._add_route(route)
-        return endpoint
+def routes(
+	*args,
+	path: str = None,
+	middleware: list = [],
+	methods: list = [],
+	defaults: dict = {}
+):
+	"""DRY: create routes with similar configuration"""
+	return tuple(
+		route\
+			.insert_middleware(middleware)\
+			.mount(path)\
+			.add_methods(methods)\
+			.add_defaults(defaults)
+		for route in collapse(args)
+	)
 
-    def extend(self, routes: Iterable[Route], path='', context=True):
-        """
 
-        path should be empty or start with a slash
 
-        e.g.
-            api.extend(routes, '/v5')
-        or
-            versions.extend(routes, '/v5')
-            api.extend(versions)
+def route(*args, **kwargs):
+	""""""
+	if len(args) == 1:
+		view_func = args[0]
+		path = f'/{view_func.__name__}'
+	elif len(args) == 2:
+		path, view_func = args
+	else:
+		raise ValueError(f'route() expected 1-2 args, got {len(args)}')
+	return Route(
+		path = path,
+		view_func = wraps(view_func)(lambda: run_in_kwargs(context, view_func)),
+		**kwargs
+	)
 
-        if context is True, this context will wrap the routes
 
-        """
-        for route in routes:
-            route = replace(route, path = path + route.path)
-            if context:
-                route = replace(route, context = [self.context, route.context])
-            self._add_route(route)
+# some standard http methods
+get = partial(route, methods=['GET'])
+post = partial(route, methods=['POST'])
+put = partial(route, methods=['PUT'])
+delete = partial(route, methods=['DELETE'])
+patch = partial(route, methods=['PATCH'])
+options = partial(route, methods=['OPTIONS'])
+
+# the 7 RESTful routes
+index = partial(get, '/')
+new = partial(get, '/new')
+create = partial(post, '/')
+show = partial(get, '/<id>')
+edit = partial(get, '<id>/edit')
+update = partial(route, '/<id>', methods=['PATCH', 'PUT'])
+destroy = partial(delete, '/<id>')

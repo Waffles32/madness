@@ -1,8 +1,8 @@
 # madness
 
-Madness orchestrates the HTTP request-response cycle using context functions to build abstractions and route functions to transform abstractions into a HTTP response.
+Madness orchestrates the HTTP request-response cycle using middleware for abstractions and routes for transformations.
 
-It is built upon the fabulous [werkzeug](https://github.com/pallets/werkzeug) routing system.
+It is built upon WSGI and the fabulous [werkzeug](https://github.com/pallets/werkzeug) routing system.
 
 
 ## Guiding Principles
@@ -24,107 +24,59 @@ $ pip install -U madness
 ## A Simple Example
 
 ```python
-from madness import Madness, response
+from madness import run
 
-app = Madness()
-
-@app.index
 def hello():
-    return response(['Hello, world!'])
+    return 'Hello, world!'
 
 if __name__ == '__main__':
-    app.run()
+    run(hello)
 ```
-
 
 ## Routing
 
-`@app.route(*paths, methods=[], context=[], origin=None, headers=[])`          
-
-option | description
------------- | -------------
-`*paths` | relative paths, defaults to the decorated function name
-`methods` | list of allowed http methods
-`context` | list of extra context functions see #Context
-`origin` | allowed origin: \* or list of urls
-`headers` | allowed request headers: list of header names
-`vary` | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Vary
-`max_age` | https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Max-Age
-`wsgi` | set to True if the route implements a [WSGI interface](https://www.python.org/dev/peps/pep-0333/)
-
-***
-
-### convenience methods for `@app.route`
-
-you can still use options with these!
-
-`@app.get, @app.post, @app.put, @app.delete, @app.patch, @app.options`
-
-#### RESTful routes
-
-inspired by Ruby on Rails' `resources`
-
-https://gist.github.com/alexpchin/09939db6f81d654af06b
-
-https://medium.com/@shubhangirajagrawal/the-7-restful-routes-a8e84201f206
-
-decorator | path | method
------------- | ------------- | -------------
-`@app.index` | {path} | GET
-`@app.new` | new{path} | GET
-`@app.create` | {path} | POST
-`@app.show` | /:id{path} | GET
-`@app.edit` | /:id/edit{path} | GET
-`@app.update` | /:id{path} | PATCH/PUT
-`@app.destroy` | /:id{path} | DELETE
-
-
-#### AWS Lambda
-
-see also: [RequestResponse](https://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html)
+a route may be specified with methods, middleware and defaults
 
 ```python
-from madness import json
+from madness import routes, route, get, post, put, delete, patch, index
 
-@json.schema
-class EventSchema():
-    x: int = 1
+users = routes(
+  index(lambda: 'users!'), # GET /
+  get('/<int:user_id>', lambda user_id: f'id is {user_id}')
+)
 
-@app.lambda_handler
-def process(event: EventSchema):
-    return {'y': event['x'] + 2}
+site = routes(
+  get('/', lambda: 'homepage'), # GET / .. aka index
+  route(my_function) # /my_function, any method
+  # add users routes under the /users prefix
+  routes(users, path = '/users'),
+  # limit the request methods
+  route('/foo', lambda: 'bar', methods = ['GET', 'POST']),
+  post(my_other_function), # POST /my_other_function
+)
+
 ```
 
-if you annotate the event with a marshmallow schema, it is automatically validated :)
 
-### handling routing errors
+## Application / Serving
 
-```python
-@app.error(404)
-def my404handler():
-    return response(['not found'], status = 404)
-```
+initialize an application to serve your routes through WSGI
 
-***
-
-## Modules
+### handling routing errors using middleware
 
 ```python
-from madness import Madness, response
+from madness import application, NotFound, index
 
-app = Madness()
+def custom404():
+  try:
+    yield # application tries to find a route
+  except NotFound:
+    yield 'custom 404 body', 404
 
-module = Madness()
-
-@module.route
-def thing():
-    return response(['hello!'])
-
-app.extend(module) # now app has /thing
-
-app.extend(module, 'prefix') # now app has /prefix/thing
-
-app.extend(module, context=False) # add the routes but not the context
+app = application(
+  index(lambda: 'Hello, world!'),
+  middleware = [custom404]
+)
 
 if __name__ == '__main__':
   app.run()
@@ -132,83 +84,118 @@ if __name__ == '__main__':
 
 ***
 
-## Context
+## Nesting routes / middleware
 
-madness.context contains the *abstractions* created by the previous contexts
-
-use `@context` to build abstractions for your low-level modules `@context and @route`
-
-```
-e.g.
-
-  @context authenticate the HTTP request `context.username = 'xyz'`
-
-  @context get database connection `context.database = Database()`
-
-  @context(database) use database connection `context.data = database.myobjects.find(context.id)`
-
-  @show(data) convert data to HTTP response `return json.response(data)`
-```
-
-[rule args](http://werkzeug.pocoo.org/docs/0.14/routing/) are added to context
-
-e.g. `@app.route('path/<myvar>')` creates `context.myvar`
-
-
-### Basic Context Functions
+you can nest routes and middleware as much as you need
 
 ```python
-from madness import context, json
+from madness import routes, cors, route, index, get, abort
 
-@app.context
-def before_request():
-    "could do anything here, so let's add a variable to the context!"
-    context.x = 2
+api = routes(
 
-@app.context
-def continue_processing(x):
-    "define context.y based on context.x!"
-    context.y = x * 3 # 6
+  # public API
+  index(lambda: '1.0.0'),
+  post('/login', lambda: abort(401)),
 
-@app.route
-def double(y):
-    "doubles context.y and sends it as a JSON response"
-    return json.response(y * 2) # 12
+  # login required
+  routes(
+    routes(
+      users,
+      path = '/users',
+      middleware = [
+        # middleware to abstract the user database implementation
+        users_database_implementation
+      ]
+    ),
+    get('/groups', lambda: 'groups resource')
+    middleware = [
+      # check that the client is logged in
+      authorize
+    ]
+  ),
 
+  middleware = [
+    # authenticate any client that accesses the API
+    authenticate
+  ]
+
+)
+
+app = application(
+  index(lambda: 'Welcome to my app!'),
+  # enable CORS for our API and static resources
+  cors(
+    routes(api, path = '/api'),
+    route('/static/<path:filename>', lambda: 'not implemented'),
+    # CORS settings
+    origin = '*'
+  ),
+  middleware = [my_application_middleware]
+)
+
+if __name__ == '__main__':
+  app.run()
 ```
+
 
 ***
 
-### Advanced Context Generators
+## Middleware
 
-a context has full access to the request/response/exceptions
+use madness.context to store *abstractions* for your higher level middleware/routes
 
-the response/exception is bubbled through the context handlers
+[rule args](http://werkzeug.pocoo.org/docs/0.14/routing/) are added to context after successful routing
+
+middleware has full access to request/response/exceptions
+
+passing middleware to a madness.application will allow you to catch routing errors
+
+the response/exception is bubbled through the middleware
 
 ```python
-@app.context
-def advanced_context():
+from madness import request, json
+
+def overkill_middleware():
+    """demonstrates every """
     # before_request
     if request.headers.get('x-api-key') != 'valid-api-key':
         # abort
         yield json.response({'message': 'invalid api key'}, status = 403)
     else:
-        # run remaining context functions and the route endpoint (if not aborted)
         try:
             response = yield
-
         except MyException as exception:
             yield json.response({'message': exception.message}, status = 500)
-
         else:
             # modify the response headers
             response.headers['x-added-by-context'] = 'value'
-
             # abort
             yield json.response('we decided to not send the original response, isn\'t that weird?')
-
         finally:
             # after_request
             pass
+```
 
+
+### RESTful routes
+
+inspired by Ruby on Rails' `resources` and these links
+
+https://gist.github.com/alexpchin/09939db6f81d654af06b
+
+https://medium.com/@shubhangirajagrawal/the-7-restful-routes-a8e84201f206
+
+```python
+from madness import routes, index, new, create, show, edit, update, destroy
+
+users = routes(
+  index(get_all_users),
+  new(new_user_form),
+  create(add_user),
+  show(get_one_user),
+  edit(edit_user_form),
+  update(update_user),
+  destroy(delete_user),
+  path = '/users'
+)
 ```

@@ -1,93 +1,103 @@
 
-from dataclasses import dataclass, field
-from pprint import pprint
-from typing import Dict, Callable
+from dataclasses import replace
+from typing import Callable, List
 
-from werkzeug.exceptions import HTTPException
+from more_itertools import collapse
 from werkzeug.routing import Map
 from werkzeug.serving import run_simple
+from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Request
 
-from .context import *
-from .decorators import decoratormethod
-from .routing import RoutingMixIn
+from .routines import run_in_middleware
+from .context import local, context, local_manager
+from .wrappers import response
+from .routing import routes
 
 
-@dataclass
-class ApplicationMixIn(RoutingMixIn):
+def force_type_middleware():
+	"""...
+	similar to Flask's force_type
+	allows returning tuple
 
-    _application = None
+	body
+	body, status
+	body, status, headers
+	"""
+	obj = yield
+	if isinstance(obj, (str, bytes)):
+		yield response([obj])
+	elif isinstance(obj, tuple):
+		try:
+			body, status, headers = obj
+		except ValueError:
+			body, status = obj
+			headers = {}
+		if isinstance(body, (str, bytes)):
+			body = [body]
+		yield response(body, status=status, headers=headers)
 
-    errors: Dict[int, Callable] = field(default_factory=dict)
 
-    @decoratormethod
-    def error(self, endpoint, status_code=None):
-        """register an error handler e.g. 404
-        should be used on the top level routes
-        """
-        self.errors[status_code] = endpoint
-        return endpoint
+def create_app(*args, middleware: List[Callable] = []) -> Callable:
+	"""allows middleware to catch routing errors, returns WSGI application"""
+	global Map, local_manager
 
-    def get_application(self, debug:bool=False) -> Callable:
+	url_map = Map([route.as_rule() for route in routes(*args)])
 
-        mapper = Map([route.rule for route in self])
+	def get_response(environ, start_response):
+		global context
+		nonlocal url_map
+		urls = url_map.bind_to_environ(environ)
+		view_func, kwargs = urls.match()
+		context.update(kwargs)
+		return view_func()
 
-        errors = {
-            code: bind(endpoint, self.context)
-            for code, endpoint in self.errors.items()
-        }
+	def context_middleware(environ, start_response):
+		""""""
+		global local, HTTPException, Request
+		local.request = Request(environ)
+		local.context = {}
+		try:
+			response = yield
+		except HTTPException as response:
+			yield response
 
-        if debug:
-            print('-'*10, 'routes', '-'*10)
-            for route in self:
-                print(route)
-            print('-'*28)
-            pprint(errors)
-            print('-'*28)
+	@local_manager.make_middleware
+	def application(environ, start_response):
+		global force_type_middleware
+		nonlocal middleware, get_response, context_middleware
+		response = run_in_middleware(
+			lambda : get_response(environ, start_response),
+			[
+				force_type_middleware,
+				lambda : context_middleware(environ, start_response),
+				*middleware
+			]
+		)
+		return response(environ, start_response)
 
-        @local_manager.make_middleware
-        def wsgi_application(environ, start_response):
-            global local, Request
-            nonlocal mapper, errors
-            local.request = Request(environ)
-            local.context = Context(debug=debug)
-            adapter = mapper.bind_to_environ(environ)
-            try:
-                endpoint, kwargs = adapter.match()
-            except HTTPException as response:
-                try:
-                    endpoint = errors[response.code]
-                except:
-                    try:
-                        endpoint = errors[None]
-                    except KeyError:
-                        return response(environ, start_response)
-                response = endpoint()
-                return response(environ, start_response)
-            else:
-                try:
-                    # add path parameters to context
-                    context.update(kwargs)
-                    response = context.run(endpoint)
-                    return response(environ, start_response)
-                except HTTPException as response:
-                    return response(environ, start_response)
+	return application
 
-        return wsgi_application
 
-    def __call__(self, environ, start_response):
-        """the WSGI application"""
-        if self._application_changed:
-            self._application = self.get_application()
-            self._application_changed = False
-        return self._application(environ, start_response)
+class Application():
+	""""""
 
-    def run(self, *, port=9090, host='127.0.0.1', debug=True):
-        """run development server"""
-        run_simple(
-            host,
-            port,
-            self.get_application(debug=debug),
-            use_debugger = debug,
-            use_reloader = debug
-        )
+	def __init__(self, *args, **kwargs):
+		super().__init__()
+		self.wsgi_app = create_app(*args, **kwargs)
+
+	def __call__(self, environ, start_response):
+		return self.wsgi_app(environ, start_response)
+
+	def run(
+		self,
+		host: str = 'localhost',
+		port: int = 9090,
+		debug: bool = None,
+		use_reloader: bool = None
+	):
+		run_simple(
+			host,
+			port,
+			self.wsgi_app,
+			use_reloader = True if debug == None and use_reloader == None else use_reloader
+		)

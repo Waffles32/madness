@@ -1,48 +1,47 @@
 
-from functools import wraps
-from typing import Callable, Tuple, List, Any
+from dataclasses import replace
 
-from werkzeug.wrappers import Response
+from .routing import routes, route
+from .context import request
+from .wrappers import response
 
-from .decorators import decoratormethod
+from typing import List, Any
 
-class CORSMixIn():
-    "https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS"
+def options(
+    *,
+    origin: Any = '*',
+    methods: List[str] = [],
+    headers: List[str] = [],
+    vary: str = None,
+    max_age: int = None
+):
+    methods = methods + ['OPTIONS']
+    options_headers = {}
+    request_origin = request.environ.get('HTTP_ORIGIN', '*')
+    if request_origin in origin:
+        options_headers['Access-Control-Allow-Origin'] = request_origin
+        options_headers['Access-Control-Allow-Methods'] = ', '.join(methods)
+        if headers != None:
+            options_headers['Access-Control-Allow-Headers'] = ', '.join(headers)
+    if vary:
+        options_headers['Vary'] = vary
+    if max_age != None:
+        options_headers['Access-Control-Max-Age'] = str(max_age)
+    return response([], headers=options_headers)
 
-    @decoratormethod
-    def route(self, endpoint:Callable, *paths:Tuple[str], origin:Any=[], max_age:int=None, vary:str=None, methods:List[str]=[], headers:List[str]=None, **kwargs) -> Callable:
-        """
-        origin may be a list of urls or '*'
-        headers is a whitelist of request headers
-        default is to allow all headers
-        """
+def cors_view(route, **kwargs):
+    return lambda : options(methods=route.methods, **kwargs)
 
-        if 'OPTIONS' in methods:
-            @wraps(endpoint)
-            def wrapped_endpoint():
-                if request.method == 'OPTIONS':
-
-                    options_headers = {}
-
-                    request_origin = request.environ.get('HTTP_ORIGIN', '*')
-
-                    if request_origin in origin:
-                        options_headers['Access-Control-Allow-Origin'] = request_origin
-                        options_headers['Access-Control-Allow-Methods'] = ', '.join(methods)
-                        if headers != None:
-                            options_headers['Access-Control-Allow-Headers'] = ', '.join(headers)
-
-                    if vary:
-                        options_headers['Vary'] = vary
-
-                    if max_age != None:
-                        options_headers['Access-Control-Max-Age'] = str(max_age)
-
-                    return Response([], headers=options_headers)
-                else:
-                    return context.run(endpoint)
-        else:
-            wrapped_endpoint = endpoint
-
-        super().route(wrapped_endpoint, *paths, methods=methods, **kwargs)
-        return endpoint
+def cors(*args, **kwargs):
+    """options: origin, methods, headers, vary, max_age"""
+    return routes(
+        [
+            replace(
+                route,
+                view_func = cors_view(route, **kwargs),
+                methods = ['OPTIONS']
+            ),
+            route
+        ]
+        for route in routes(*args)
+    )

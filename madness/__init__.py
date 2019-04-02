@@ -1,20 +1,13 @@
-#!/usr/bin/env python3.7
 
-from dataclasses import dataclass
+from werkzeug.exceptions import *
+from werkzeug.exceptions import abort
 
-from werkzeug.wrappers import Response as response
-from werkzeug.utils import redirect
-
-from .aws import LambdaMixIn
-from .cors import CORSMixIn
-from .restful import RESTFulRoutesMixIn
-from .application import ApplicationMixIn
+from .routing import *
+from .wrappers import response
+from .cors import cors
 from .context import request, context
-from .leverage import ApplicationAsRouteMixIn
+from .application import Application as application
 
-__all__ = ()
-
-@dataclass
-class Madness(CORSMixIn, LambdaMixIn, RESTFulRoutesMixIn, ApplicationAsRouteMixIn, ApplicationMixIn):
-    """
-    """
+def run(view_func, **kwargs):
+	"""runs a single route application"""
+	application(route('/', view_func)).run(**kwargs)
