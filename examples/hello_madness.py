@@ -1,32 +1,27 @@
 
 from madness import (
-	request, context, json, response,
+	request, g, json, response,
 	application, routes, route, get, post, index,
-	abort, NotFound
+	abort, NotFound, cors
 )
 
-from standard_stream_middleware import capture_output
+from hello_stream_with_context import logging_middleware
+from hello_routing import custom404
 
 ### MIDDLEWARE ###
 
-def logging():
-	try:
-		yield
-	except NotFound:
-		print('interesting...')
-		yield 'custom 404 page', 404
-	finally:
-		print(request.method, request.path, '->', repr(context['output']))
-
-
 def authenticate():
 	print('authenticating...')
-	context['username'] = 'guest'
+	g.username = 'guest'
 
 def authorize():
 	print('authorizing...')
-	if context['username'] == 'foo':
+	if g.username == 'foo':
 		abort(403)
+
+def jsonify():
+	obj = yield
+	yield json.response(obj)
 
 
 ### VIEWS ###
@@ -38,18 +33,22 @@ def login():
 		abort(401)
 
 
+# RESTful users routes
+
 USERS = {
 	1: {'name': 'Waffles32'},
 	2: {'name': 'foo'},
 	3: {'name': 'bar'}
 }
 
-# JSON resource
 users = routes(
 	index(lambda: USERS),
 	get('/<int:user_id>', lambda user_id: USERS.get(user_id) or abort(404)),
-	middleware = [json.jsonify]
+	middleware = [jsonify]
 )
+
+
+# put it all together
 
 site = routes(
 	index(lambda: 'Hello, world!'), # /
@@ -58,13 +57,17 @@ site = routes(
 	routes(
 		routes(users, path = '/users', middleware = [authorize]),
 		get('/profile', lambda username: f'Welcome, {username}!'),
+		cors(
+			get('/example', lambda: 'CORS is enabled!'),
+			origin = '*'
+		),
 		middleware = [authenticate],
 	)
 )
 
 app = application(
 	site,
-	middleware = [logging, capture_output]
+	middleware = [logging_middleware]
 )
 
 if __name__ == '__main__':

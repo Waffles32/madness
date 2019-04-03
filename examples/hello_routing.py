@@ -1,5 +1,10 @@
 
-from madness import route, routes, cors, get, request, response, NotFound, application
+from madness import (
+    request, response,
+    application, routes, cors,
+    route, get,
+    NotFound
+)
 
 api = routes(
     route('/', lambda : 'home'),
@@ -18,6 +23,7 @@ site = routes(
     cors(api, origin = '*', headers = ['x-api-key']),
     cors(
         routes(staticfiles, path = '/static'),
+        route('/foo', lambda: 'bar'),
         origin = '*'
     ),
     route('/echo', lambda: request.get_data())
@@ -26,7 +32,7 @@ site = routes(
 
 def custom404():
     try:
-        yield
+        response = yield
     except NotFound:
         yield 'Nothing here!', 404
 

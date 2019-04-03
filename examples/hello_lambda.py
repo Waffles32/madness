@@ -1,19 +1,19 @@
 
-from madness import application, routes, post, json
+from madness import application, routes, post, json, g
 
 # middleware: abstractions
 
 def lambda_handler():
-	context['event'] = json.request()
+	g.event: dict = json.request()
 	obj = yield
 	yield json.response(obj)
 
-def abstract_x():
+def abstract_x(event):
     """abstract the event"""
-    context['x']: int = context['event']['x']
+    g.x: int = event['x']
 
 
-# views: transformations
+# views: data transformations, completely abstracted
 
 def add_one(x: int) -> dict:
     return {'x': x + 1}
@@ -22,13 +22,14 @@ def subtract_one(x: int) -> dict:
     return {'x': x - 1}
 
 
-# routes: make it accessible via HTTP
+# routes & application: make it accessible via HTTP
 
 app = application(
     routes(
-        post(add_one),
-        post(subtract_one),
-        middleware = [lambda_handler, abstract_x]
+        post(add_one), # POST /api/add_one
+        post(subtract_one), # POST /api/subtract_one
+        middleware = [lambda_handler, abstract_x],
+		path = '/api'
     )
 )
 
