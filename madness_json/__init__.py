@@ -4,13 +4,13 @@ from simplejson import loads, dumps
 from functools import partial
 from werkzeug.wrappers import Response
 from more_itertools import chunked
+from madness import request as _request
 
-from ..context import request as _request
 from .idumps import idumps
 
 __all__ = 'request', 'response'
 
-def response(obj, bufsize=100000, **kwargs):
+def response(obj, bufsize=10000, **kwargs):
 	return Response(
 		(
 			''.join(chunk)
