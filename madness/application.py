@@ -1,6 +1,7 @@
 
 from dataclasses import replace
 from typing import Callable, List
+from functools import partial
 
 from more_itertools import collapse
 from werkzeug.routing import Map
@@ -8,11 +9,11 @@ from werkzeug.serving import run_simple
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Request
 
-from .routines import run_in_middleware
-from .context import local, context, local_manager
+from .context import local, context, local_manager, Context
 from .wrappers import response
 from .routing import routes
-
+from .middleware import create_stack, notify_stack
+from .routines import run_in_kwargs
 
 def force_type_middleware():
 	"""...
@@ -37,43 +38,81 @@ def force_type_middleware():
 		yield response(body, status=status, headers=headers)
 
 
+def abort_middleware():
+	"""support for abort()"""
+	global HTTPException
+	try:
+		yield
+	except HTTPException as response:
+		yield response
+
+
 def create_app(*args, middleware: List[Callable] = []) -> Callable:
 	"""allows middleware to catch routing errors, returns WSGI application"""
 	global Map, local_manager
 
-	url_map = Map([route.as_rule() for route in routes(*args)])
+	endpoints = {}
+	rules = []
+	for i, route in enumerate(routes(*args)):
+		endpoints[i] = route
+		rule = route.as_rule(endpoint=i)
+		rules.append(rule)
 
-	def get_response(environ, start_response):
-		global context
-		nonlocal url_map
-		urls = url_map.bind_to_environ(environ)
-		view_func, kwargs = urls.match()
-		context.update(kwargs)
-		return view_func()
+	url_map = Map(rules)
 
-	def context_middleware(environ, start_response):
-		""""""
-		global local, HTTPException, Request
-		local.request = Request(environ)
-		local.context = {}
-		try:
-			response = yield
-		except HTTPException as response:
-			yield response
+	middleware = tuple(
+		partial(run_in_kwargs, context, func)
+		for func in middleware
+	)
 
 	@local_manager.make_middleware
 	def application(environ, start_response):
-		global force_type_middleware
-		nonlocal middleware, get_response, context_middleware
-		response = run_in_middleware(
-			lambda : get_response(environ, start_response),
-			[
+		global local, force_type_middleware, create_stack, notify_stack, context, Request, Context
+		nonlocal middleware, url_map, endpoints
+
+		# initialize thread locals
+		local.request = Request(environ)
+		local.context = Context() # user managed context
+		# application managed context
+
+		print('context is', context, type(context))
+
+		stack = list(
+			create_stack((
+				abort_middleware,
 				force_type_middleware,
-				lambda : context_middleware(environ, start_response),
-				*middleware
-			]
+				*middleware,
+				force_type_middleware
+			))
 		)
-		return response(environ, start_response)
+
+		try:
+			# route the request, may raise HTTPException such as NotFound
+			urls = url_map.bind_to_environ(environ)
+			endpoint, kwargs = urls.match()
+			for key, value in kwargs.items():
+				setattr(local.context, key, value)
+			route = endpoints[endpoint]
+			# add the route's middleware to the stack
+			stack.extend(create_stack(route.middleware))
+			response = route.view_func()
+
+		# allow the stack to swap out the response application
+		except Exception as exception:
+			response = notify_stack(stack, exception = exception)
+		else:
+			response = notify_stack(stack, value = response)
+
+		# allow stack to handle errors that happen while streaming the response
+		try:
+			yield from response(environ, start_response)
+			# for chunk in response(environ, start_response):
+			# 	print('send', len(chunk))
+			# 	yield chunk
+		except Exception as exception:
+			notify_stack(stack, exception=exception)
+		else:
+			notify_stack(stack)
 
 	return application
 
@@ -90,14 +129,15 @@ class Application():
 
 	def run(
 		self,
-		host: str = 'localhost',
+		host: str = '127.0.0.1',
 		port: int = 9090,
-		debug: bool = None,
-		use_reloader: bool = None
+		debug: bool = True
 	):
 		run_simple(
 			host,
 			port,
 			self.wsgi_app,
-			use_reloader = True if debug == None and use_reloader == None else use_reloader
+			use_reloader = debug,
+			use_debugger = False,
+			use_evalex = False,
 		)

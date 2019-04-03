@@ -5,7 +5,7 @@ from werkzeug.exceptions import abort
 from .routing import *
 from .wrappers import response
 from .cors import cors
-from .context import request, context
+from .context import request, context as g
 from .application import Application as application
 
 def run(view_func, **kwargs):

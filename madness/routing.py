@@ -6,7 +6,7 @@ from functools import partial, wraps
 from more_itertools import collapse
 from werkzeug.routing import Rule
 
-from .routines import run_in_middleware, run_in_kwargs
+from .routines import run_in_kwargs
 from .context import context
 
 __all__ = (
@@ -25,16 +25,13 @@ class Route():
 	defaults: dict = field(default_factory=dict)
 	middleware: list = field(default_factory=list)
 
-	def as_rule(self):
+	def as_rule(self, **kwargs):
 		return Rule(
 			self.path,
-			endpoint = self.as_view(),
 			methods = self.methods or None,
-			defaults = self.defaults
+			defaults = self.defaults,
+			**kwargs
 		)
-
-	def as_view(self):
-		return lambda: run_in_middleware(self.view_func, self.middleware)
 
 	def mount(self, path=None):
 		return replace(self, path = f'{path}{self.path}' if path else self.path)
