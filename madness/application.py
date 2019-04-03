@@ -73,9 +73,6 @@ def create_app(*args, middleware: List[Callable] = []) -> Callable:
 		# initialize thread locals
 		local.request = Request(environ)
 		local.context = Context() # user managed context
-		# application managed context
-
-		print('context is', context, type(context))
 
 		stack = list(
 			create_stack((
