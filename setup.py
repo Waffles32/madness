@@ -11,7 +11,7 @@ setup(
     long_description = Path("README.md").read_text(),
     long_description_content_type = "text/markdown",
     url = "https://github.com/Waffles32/madness",
-    packages = find_packages(),
+    packages = ['madness'],
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Topic :: Internet :: WWW/HTTP :: WSGI",
