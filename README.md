@@ -107,3 +107,5 @@ as request-contextmanager
 as response contextmanager
 
 as request-response contextmanager
+
+as error handler
