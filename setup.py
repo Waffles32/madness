@@ -4,7 +4,7 @@ from pathlib import Path
 
 setup(
     name = "madness",
-    version = "0.5.0",
+    version = "0.6.0",
     author = "Forrest Button",
     author_email = "forrest.button@gmail.com",
     description = "wsgi microframework suitable for building modular DRY RESTful APIs",
