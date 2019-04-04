@@ -1,15 +1,16 @@
 
+from dataclasses import dataclass
+
 from werkzeug.local import Local, LocalManager, LocalProxy, LocalStack
 
 local = Local()
 local_manager = LocalManager([local])
 request = local('request')
-context = local('context')
+g = local('g')
 
-class Context(dict):
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
+class G(object):
+    """user managed request context
+    """
 
     def __contains__(self, key):
         return hasattr(self, key)

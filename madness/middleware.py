@@ -1,14 +1,35 @@
 
 from inspect import isgenerator
+from typing import Iterable, Callable, Generator, Any
 
-def create_stack(middleware):
+
+class Stack(list):
+
+	def add(self, middleware: Iterable[Callable]):
+		for gen in create_stack(middleware):
+			self.append(gen)
+
+	def send(self, value: Any):
+		return notify_stack(self, value = value)
+
+	def throw(self, exception: Exception):
+		return notify_stack(self, exception = exception)
+
+
+def create_stack(
+	middleware: Iterable[Callable]
+) -> Iterable[Generator]:
 	for func in middleware:
 		gen = func()
 		if isgenerator(gen):
 			gen.send(None)
 			yield gen
 
-def notify_stack(stack, value=None, exception=None):
+def notify_stack(
+	stack: Iterable[Generator],
+	value: Any = None,
+	exception: Exception = None
+):
 	"""
     Errors should never pass silently.
     Unless explicitly silenced.

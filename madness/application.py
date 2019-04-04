@@ -2,18 +2,18 @@
 from dataclasses import replace
 from typing import Callable, List
 from functools import partial
+from collections import OrderedDict
 
-from more_itertools import collapse
+from more_itertools import collapse, partition
 from werkzeug.routing import Map
 from werkzeug.serving import run_simple
 from werkzeug.exceptions import HTTPException
-from werkzeug.wrappers import Request
+from werkzeug.wrappers import Request, Response as response
 
-from .context import local, context, local_manager, Context
-from .wrappers import response
-from .routing import routes
-from .middleware import create_stack, notify_stack
-from .routines import run_in_kwargs
+from .context import local, g, local_manager, G, request
+from .routing import routes, Route
+from .middleware import create_stack, notify_stack, Stack
+
 
 def force_type_middleware():
 	"""...
@@ -25,6 +25,7 @@ def force_type_middleware():
 	body, status, headers
 	"""
 	obj = yield
+
 	if isinstance(obj, (str, bytes)):
 		yield response([obj])
 	elif isinstance(obj, tuple):
@@ -47,71 +48,72 @@ def abort_middleware():
 		yield response
 
 
-def create_app(*args, middleware: List[Callable] = []) -> Callable:
-	"""allows middleware to catch routing errors, returns WSGI application"""
+def create_app(
+	*args,
+	g_factory: Callable = G
+) -> Callable:
+	"""convert routes into a WSGI application
+	middleware added here is initilized BEFORE routing, so it can catch NotFound
+	"""
 	global Map, local_manager
 
-	endpoints = {}
-	rules = []
-	for i, route in enumerate(routes(*args)):
-		endpoints[i] = route
-		rule = route.as_rule(endpoint=i)
-		rules.append(rule)
-
-	url_map = Map(rules)
-
-	middleware = tuple(
-		partial(run_in_kwargs, context, func)
-		for func in middleware
+	middleware, args = partition(
+		lambda obj: isinstance(obj, Route),
+		collapse(args)
 	)
+
+	endpoints = OrderedDict(enumerate(routes(*args)))
+	rules = [route.as_rule(endpoint=i) for i, route in endpoints.items()]
+	url_map = Map(rules)
 
 	@local_manager.make_middleware
 	def application(environ, start_response):
-		global local, force_type_middleware, create_stack, notify_stack, context, Request, Context
-		nonlocal middleware, url_map, endpoints
+		global local, force_type_middleware, Stack, Request
+		nonlocal middleware, url_map, endpoints, g_factory
 
 		# initialize thread locals
-		local.request = Request(environ)
-		local.context = Context() # user managed context
+		environ['madness.request'] = local.request = Request(environ)
+		environ['madness.stack'] = stack = Stack()
+		environ['madness.g'] = local.g = g_factory()
 
-		stack = list(
-			create_stack((
+		try:
+			# initialize the stack with application middleware
+			stack.add((
 				abort_middleware,
 				force_type_middleware,
 				*middleware,
 				force_type_middleware
 			))
-		)
 
-		try:
 			# route the request, may raise HTTPException such as NotFound
 			urls = url_map.bind_to_environ(environ)
 			endpoint, kwargs = urls.match()
 			for key, value in kwargs.items():
-				setattr(local.context, key, value)
+				setattr(local.g, key, value)
 			route = endpoints[endpoint]
+
 			# add the route's middleware to the stack
-			stack.extend(create_stack(route.middleware))
+			stack.add(route.middleware)
+
 			response = route.view_func()
 
 		# allow the stack to swap out the response application
 		except Exception as exception:
-			response = notify_stack(stack, exception = exception)
+			response = stack.throw(exception)
 		else:
-			response = notify_stack(stack, value = response)
+			response = stack.send(response)
 
 		# allow stack to handle errors that happen while streaming the response
 		try:
 			yield from response(environ, start_response)
-			# for chunk in response(environ, start_response):
-			# 	print('send', len(chunk))
-			# 	yield chunk
 		except Exception as exception:
-			notify_stack(stack, exception=exception)
+			stack.throw(exception)
 		else:
-			notify_stack(stack)
+			stack.send(None)
 
 	return application
+
+
 
 
 class Application():
