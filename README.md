@@ -89,11 +89,11 @@ urls = routes(
 
 ## Abstractions (Dependency inversion principle)
 
-g
+* g
 
-extending g
+* extending g
 
-madness.G and g_factory
+* madness.G and g_factory
 
 
 ## Middleware (Coroutines)
@@ -109,3 +109,10 @@ as response contextmanager
 as request-response contextmanager
 
 as error handler
+
+
+## Extensions
+
+* json
+
+* cors
