@@ -62,7 +62,7 @@ urls = routes(
   index(hello),
   routes(
     index(lambda: 'foo')
-    route(bar, lambda: 'bar', methods=['GET', 'POST', 'PUT']),
+    route(bar, methods=['GET', 'POST', 'PUT']),
     path = '/foo'
   )
 )
