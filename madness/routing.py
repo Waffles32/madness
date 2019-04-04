@@ -1,13 +1,10 @@
 
 from dataclasses import dataclass, field, replace
-from typing import Callable
+from typing import Callable, Iterable
 from functools import partial, wraps
 
-from more_itertools import collapse
+from more_itertools import collapse, partition
 from werkzeug.routing import Rule
-
-from .routines import run_in_kwargs
-from .context import context
 
 __all__ = (
 	'routes',
@@ -25,7 +22,7 @@ class Route():
 	defaults: dict = field(default_factory=dict)
 	middleware: list = field(default_factory=list)
 
-	def as_rule(self, **kwargs):
+	def as_rule(self, **kwargs) -> Rule:
 		return Rule(
 			self.path,
 			methods = self.methods or None,
@@ -45,27 +42,10 @@ class Route():
 	def add_defaults(self, defaults):
 		return replace(self, defaults = {**defaults, **self.defaults})
 
-def routes(
-	*args,
-	path: str = None,
-	middleware: list = [],
-	methods: list = [],
-	defaults: dict = {}
-):
-	"""DRY: create routes with similar configuration"""
-	return tuple(
-		route\
-			.insert_middleware(middleware)\
-			.mount(path)\
-			.add_methods(methods)\
-			.add_defaults(defaults)
-		for route in collapse(args)
-	)
 
-
-
-def route(*args, **kwargs):
-	""""""
+def route(*args, **kwargs) -> Route:
+	"""
+	"""
 	if len(args) == 1:
 		view_func = args[0]
 		path = f'/{view_func.__name__}'
@@ -75,7 +55,7 @@ def route(*args, **kwargs):
 		raise ValueError(f'route() expected 1-2 args, got {len(args)}')
 	return Route(
 		path = path,
-		view_func = wraps(view_func)(lambda: run_in_kwargs(context, view_func)),
+		view_func = view_func,
 		**kwargs
 	)
 
@@ -96,3 +76,39 @@ show = partial(get, '/<id>')
 edit = partial(get, '<id>/edit')
 update = partial(route, '/<id>', methods=['PATCH', 'PUT'])
 destroy = partial(delete, '/<id>')
+
+
+
+def _routes(
+	*args,
+	path: str = None,
+	middleware: list = [],
+	methods: list = [],
+	defaults: dict = {}
+):
+	"""DRY: create routes with similar configuration"""
+	for route in collapse(args):
+		yield route\
+			.insert_middleware(middleware)\
+			.mount(path)\
+			.add_methods(methods)\
+			.add_defaults(defaults)
+
+def routes(*args, **kwargs) -> Iterable[Route]:
+	"""DRY: create routes with similar configuration"""
+	urls = []
+	args = tuple(collapse(args))
+	key = lambda arg: not isinstance(arg, Route)
+	for i, arg in enumerate(args):
+		if isinstance(arg, Route):
+			urls.append(
+				replace(
+					arg,
+					middleware = [
+						*filter(key, args[:i]),
+						*arg.middleware,
+						*filter(key, args[i+1:])
+					]
+				)
+			)
+	return tuple(_routes(urls, **kwargs))
