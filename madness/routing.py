@@ -21,6 +21,7 @@ class Route():
 	methods: list = field(default_factory=list)
 	defaults: dict = field(default_factory=dict)
 	middleware: list = field(default_factory=list)
+	strict_slashes: bool = field(default_factory=lambda: None)
 
 	def as_rule(self, **kwargs) -> Rule:
 		return Rule(

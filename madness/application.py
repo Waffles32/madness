@@ -15,30 +15,6 @@ from .routing import routes, Route
 from .middleware import create_stack, notify_stack, Stack
 
 
-def force_type_middleware():
-	"""...
-	similar to Flask's force_type
-	allows returning tuple
-
-	body
-	body, status
-	body, status, headers
-	"""
-	obj = yield
-
-	if isinstance(obj, (str, bytes)):
-		yield response([obj])
-	elif isinstance(obj, tuple):
-		try:
-			body, status, headers = obj
-		except ValueError:
-			body, status = obj
-			headers = {}
-		if isinstance(body, (str, bytes)):
-			body = [body]
-		yield response(body, status=status, headers=headers)
-
-
 def abort_middleware():
 	"""support for abort()"""
 	global HTTPException
@@ -50,7 +26,9 @@ def abort_middleware():
 
 def create_app(
 	*args,
-	g_factory: Callable = G
+	g_factory: Callable = G,
+	strict_slashes = False,
+	request_class = Request
 ) -> Callable:
 	"""convert routes into a WSGI application
 	middleware added here is initilized BEFORE routing, so it can catch NotFound
@@ -63,39 +41,60 @@ def create_app(
 	)
 
 	endpoints = OrderedDict(enumerate(routes(*args)))
-	rules = [route.as_rule(endpoint=i) for i, route in endpoints.items()]
+	rules = [
+		route.as_rule(
+			endpoint = i,
+			strict_slashes = strict_slashes if route.strict_slashes is None else route.strict_slashes
+		)
+		for i, route in endpoints.items()
+	]
 	url_map = Map(rules)
+
+	middleware = [
+		abort_middleware,
+		#force_type_middleware,
+		*middleware,
+		#force_type_middleware
+	]
 
 	@local_manager.make_middleware
 	def application(environ, start_response):
 		global local, force_type_middleware, Stack, Request
-		nonlocal middleware, url_map, endpoints, g_factory
+		nonlocal middleware, url_map, endpoints, g_factory, request_class
+
+		print('NEW REQUEST', environ)
 
 		# initialize thread locals
-		environ['madness.request'] = local.request = Request(environ)
+		environ['madness.request'] = local.request = request_class(environ)
 		environ['madness.stack'] = stack = Stack()
 		environ['madness.g'] = local.g = g_factory()
 
 		try:
-			# initialize the stack with application middleware
-			stack.add((
-				abort_middleware,
-				force_type_middleware,
-				*middleware,
-				force_type_middleware
-			))
 
-			# route the request, may raise HTTPException such as NotFound
-			urls = url_map.bind_to_environ(environ)
-			endpoint, kwargs = urls.match()
-			for key, value in kwargs.items():
-				setattr(local.g, key, value)
-			route = endpoints[endpoint]
+			try:
+				# route the request, may raise HTTPException such as NotFound
+				urls = url_map.bind_to_environ(environ)
+				endpoint, kwargs = urls.match()
 
-			# add the route's middleware to the stack
-			stack.add(route.middleware)
+			except HTTPException as exception:
+				# initialize the stack with application middleware
+				stack.add(middleware)
+				raise exception
 
-			response = route.view_func()
+			else:
+				# apply defaults
+				for key, value in kwargs.items():
+					setattr(local.g, key, value)
+
+				# initialize the stack with application middleware
+				stack.add(middleware)
+
+				route = endpoints[endpoint]
+
+				# add the route's middleware to the stack
+				stack.add(route.middleware)
+
+				response = route.view_func()
 
 		# allow the stack to swap out the response application
 		except Exception as exception:
